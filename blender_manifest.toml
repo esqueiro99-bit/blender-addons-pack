@@ -1,0 +1,18 @@
+schema_version = "1.0.0"
+
+id = "blender_addons_pack"
+name = "Blender Add-ons Pack (All-in-One)"
+version = "3.0.0"
+tagline = "Unified collection of essential rigging, dynamic parenting, and animation tools."
+maintainer = "Plugin Hub Team <pluginhub@example.com>"
+type = "add-on"
+
+tags = ["Animation", "Rigging", "Roblox", "Game Engine", "Workflow"]
+
+blender_version_min = "3.6.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+website = "https://github.com/esqueiro99/blender-addons-pack"
