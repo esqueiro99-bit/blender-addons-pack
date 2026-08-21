@@ -25,15 +25,19 @@ class BAP_PT_DynamicParentPanel(Panel):
     bl_region_type = 'UI'
     bl_category = "Add-ons Pack"
     bl_parent_id = "BAP_PT_main_panel"
-    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout
         col = layout.column(align=True)
         col.scale_y = 1.2
-        col.operator("dp.create", text="Criar Parent", icon='CONSTRAINT')
-        col.operator("dp.disable", text="Desativar Parent", icon='CANCEL')
-        col.operator("dp.clear", text="Limpar Parent", icon='TRASH')
+        col.operator("dynamic_parent.create", text="Criar Parent", icon='KEY_HLT')
+        col.operator("dynamic_parent.enable", text="Ativar Parent", icon='CHECKMARK')
+        col.operator("dynamic_parent.disable", text="Desativar Parent", icon='KEY_DEHLT')
+        
+        row = layout.row(align=True)
+        row.scale_y = 1.1
+        row.operator("dynamic_parent.clear", text="Limpar", icon='X')
+        row.operator("dynamic_parent.bake", text="Bake & Limpar", icon='REC')
 
 
 class BAP_PT_RigConstraintsPanel(Panel):
@@ -71,7 +75,7 @@ class BAP_PT_RigConstraintsPanel(Panel):
 
 
 class BAP_PT_RigToolsPanel(Panel):
-    """Sub-painel para Ferramentas de Rigging & Armature"""
+    """Sub-painel para Ferramentas de Rig & Viewport"""
     bl_label = "Ferramentas de Rig & Viewport"
     bl_idname = "BAP_PT_rig_tools"
     bl_space_type = 'VIEW_3D'
@@ -122,7 +126,7 @@ class BAP_PT_AboutPanel(Panel):
         box = layout.box()
         box.label(text="Blender Add-ons Pack v3.0", icon='INFO')
         box.label(text="Central Oficial de Plugins Open Source")
-        box.operator("wm.url_open", text="Repositório no GitHub", icon='URL').url = "https://github.com/esqueiro99/blender-addons-pack"
+        box.operator("wm.url_open", text="Repositório no GitHub", icon='URL').url = "https://github.com/esqueiro99-bit/blender-addons-pack"
 
 
 classes = (
