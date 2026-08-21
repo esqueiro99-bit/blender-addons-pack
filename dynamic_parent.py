@@ -101,41 +101,59 @@ def insert_keyframe_constraint(obj, constraint, frame):
 
 
 def set_childof_inverse(obj, constraint):
-    """Set the inverse matrix for a Child Of constraint accurately."""
+    """Set the inverse matrix for a Child Of constraint accurately without unwanted jumps."""
+    bpy.context.view_layer.update()
+    
     if isinstance(obj, bpy.types.PoseBone):
         arm = obj.id_data
+        target = constraint.target
+        if not target:
+            return
+            
         try:
             with bpy.context.temp_override(active_object=arm, active_pose_bone=obj, constraint=constraint):
-                bpy.ops.constraint.childof_set_inverse(owner="BONE")
+                bpy.ops.constraint.childof_set_inverse(owner="BONE", constraint=constraint.name)
+                bpy.context.view_layer.update()
                 return
         except Exception:
             pass
 
-        target = constraint.target
-        if target:
-            if constraint.subtarget and target.type == "ARMATURE":
-                sub_bone = target.pose.bones.get(constraint.subtarget)
-                target_mat = target.matrix_world @ sub_bone.matrix if sub_bone else target.matrix_world
-            else:
-                target_mat = target.matrix_world
-            bone_world_mat = arm.matrix_world @ obj.matrix
+        if constraint.subtarget and target.type == "ARMATURE":
+            sub_bone = target.pose.bones.get(constraint.subtarget)
+            target_mat = target.matrix_world @ sub_bone.matrix if sub_bone else target.matrix_world
+        else:
+            target_mat = target.matrix_world
+            
+        bone_world_mat = arm.matrix_world @ obj.matrix
+        try:
             constraint.inverse_matrix = target_mat.inverted() @ bone_world_mat
+        except Exception:
+            pass
     else:
+        target = constraint.target
+        if not target:
+            return
+            
         try:
             with bpy.context.temp_override(active_object=obj, constraint=constraint):
-                bpy.ops.constraint.childof_set_inverse(owner="OBJECT")
+                bpy.ops.constraint.childof_set_inverse(owner="OBJECT", constraint=constraint.name)
+                bpy.context.view_layer.update()
                 return
         except Exception:
             pass
 
-        target = constraint.target
-        if target:
-            if constraint.subtarget and target.type == "ARMATURE":
-                sub_bone = target.pose.bones.get(constraint.subtarget)
-                target_mat = target.matrix_world @ sub_bone.matrix if sub_bone else target.matrix_world
-            else:
-                target_mat = target.matrix_world
+        if constraint.subtarget and target.type == "ARMATURE":
+            sub_bone = target.pose.bones.get(constraint.subtarget)
+            target_mat = target.matrix_world @ sub_bone.matrix if sub_bone else target.matrix_world
+        else:
+            target_mat = target.matrix_world
+            
+        try:
             constraint.inverse_matrix = target_mat.inverted() @ obj.matrix_world
+        except Exception:
+            pass
+            
+    bpy.context.view_layer.update()
 
 
 def dp_keyframe_insert_obj(obj, frame=None):
@@ -153,7 +171,7 @@ def dp_keyframe_insert_pbone(arm, pbone, frame=None):
 def dp_create_dynamic_parent_obj(op):
     obj = bpy.context.active_object
     scn = bpy.context.scene
-    list_selected_obj = bpy.context.selected_objects
+    list_selected_obj = list(bpy.context.selected_objects)
 
     if len(list_selected_obj) == 2:
         i = list_selected_obj.index(obj)
@@ -161,9 +179,11 @@ def dp_create_dynamic_parent_obj(op):
         parent_obj = list_selected_obj[0]
         current_frame = scn.frame_current
 
+        orig_matrix = obj.matrix_world.copy()
+
         dp_keyframe_insert_obj(obj, frame=current_frame)
-        bpy.ops.object.constraint_add_with_targets(type="CHILD_OF")
-        last_constraint = obj.constraints[-1]
+        last_constraint = obj.constraints.new(type="CHILD_OF")
+        last_constraint.target = parent_obj
 
         if parent_obj.type == "ARMATURE":
             subtarget_name = parent_obj.data.bones.active.name if parent_obj.data.bones.active else ""
@@ -174,27 +194,30 @@ def dp_create_dynamic_parent_obj(op):
         else:
             last_constraint.name = "DP_" + last_constraint.target.name
 
+        bpy.context.view_layer.update()
         set_childof_inverse(obj, last_constraint)
+        obj.matrix_world = orig_matrix
 
         last_constraint.influence = 0
         insert_keyframe_constraint(obj, last_constraint, frame=current_frame - 1)
 
         last_constraint.influence = 1
         insert_keyframe_constraint(obj, last_constraint, frame=current_frame)
+        dp_keyframe_insert_obj(obj, frame=current_frame)
 
         for ob in list_selected_obj:
             ob.select_set(False)
 
         obj.select_set(True)
     else:
-        op.report({"ERROR"}, "Two objects must be selected")
+        op.report({"ERROR"}, "Selecione 2 objetos: primeiro o Filho, depois o Pai.")
 
 
 def dp_create_dynamic_parent_pbone(op):
     arm = bpy.context.active_object
     pbone = bpy.context.active_pose_bone
     scn = bpy.context.scene
-    list_selected_obj = bpy.context.selected_objects
+    list_selected_obj = list(bpy.context.selected_objects)
 
     if len(list_selected_obj) == 2 or len(list_selected_obj) == 1:
         if len(list_selected_obj) == 2:
@@ -206,7 +229,7 @@ def dp_create_dynamic_parent_pbone(op):
                 if parent_obj_pbone is None:
                     op.report(
                         {"ERROR"},
-                        "Select a parent bone in the other armature",
+                        "Selecione um osso pai no outro armature",
                     )
                     return
         else:
@@ -215,15 +238,16 @@ def dp_create_dynamic_parent_pbone(op):
             if pbone in selected_bones:
                 selected_bones.remove(pbone)
             if not selected_bones:
-                op.report({"ERROR"}, "At least two bones must be selected")
+                op.report({"ERROR"}, "Selecione pelo menos 2 ossos: o Filho e o Pai.")
                 return
             parent_obj_pbone = selected_bones[0]
 
         current_frame = scn.frame_current
+        orig_matrix = pbone.matrix.copy()
 
         dp_keyframe_insert_pbone(arm, pbone, frame=current_frame)
-        bpy.ops.pose.constraint_add_with_targets(type="CHILD_OF")
-        last_constraint = pbone.constraints[-1]
+        last_constraint = pbone.constraints.new(type="CHILD_OF")
+        last_constraint.target = parent_obj
 
         if parent_obj.type == "ARMATURE":
             last_constraint.subtarget = parent_obj_pbone.name
@@ -233,15 +257,18 @@ def dp_create_dynamic_parent_pbone(op):
         else:
             last_constraint.name = "DP_" + last_constraint.target.name
 
+        bpy.context.view_layer.update()
         set_childof_inverse(pbone, last_constraint)
+        pbone.matrix = orig_matrix
 
         last_constraint.influence = 0
         insert_keyframe_constraint(pbone, last_constraint, frame=current_frame - 1)
 
         last_constraint.influence = 1
         insert_keyframe_constraint(pbone, last_constraint, frame=current_frame)
+        dp_keyframe_insert_pbone(arm, pbone, frame=current_frame)
     else:
-        op.report({"ERROR"}, "Two objects must be selected")
+        op.report({"ERROR"}, "Selecione 2 objetos/armatures")
 
 
 def enable_constraint(obj, const, frame):
